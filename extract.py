@@ -1,5 +1,5 @@
+#原始题库数据导入数据库
 from docx import Document
-from openpyxl import Workbook
 import pymysql
 import sys
 

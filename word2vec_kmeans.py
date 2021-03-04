@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import numpy as np
-import re
-from os import listdir
-import jieba
-from sklearn import feature_extraction
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.cluster import KMeans
@@ -13,7 +9,7 @@ from gensim.models import Word2Vec
 from gensim.models import word2vec
 import matplotlib.pyplot as plt
 
-outputDir = "./"  # 结果输出地址
+outputDir = "./out/"  # 结果输出地址
 filename = "data_cut.txt"
 corpus = []
 f = open(filename, 'r', encoding='utf-8')  # 语料库 按题读入成[]\
@@ -33,7 +29,7 @@ def countIdf(corpus):
     return weight, words
 
 def Kmeans_SSE(weight, start_k = 2, end_k = 20):
-    #手肘法
+    #手肘法 (权值，k值范围)
     SSE = []
     SSE_d1 = []  # sse的一阶导数
     SSE_d2 = []  # sse的二阶导数
@@ -71,7 +67,7 @@ def Kmeans_SSE(weight, start_k = 2, end_k = 20):
     return result, clusters
 
 def Kmeans_SC(weight, start_k = 2, end_k = 20):
-    #轮廓系数法
+    #轮廓系数法 （权值，范围）
     scores = []
     models = []  # 保存每次的模型
     for i in range(start_k, end_k):
@@ -95,14 +91,13 @@ def Kmeans_SC(weight, start_k = 2, end_k = 20):
         result.append('类别' + '(' + str(i) + ')' + ':' + str(label_i))
     return result, clusters
 
-def output(result, outputDir, clusters):
-    outputFile = 'out'
+def output(result, outputDir, clusters, title):
+    outputFile = title + 'out'
     type = '.txt'
     count = 0
     while (os.path.exists(outputDir + outputFile + type)):
-        a = outputDir + outputFile + type
         count += 1
-        outputFile = 'out' + str(count)
+        outputFile = title + 'out' + str(count)
     doc = open(outputDir + outputFile + type, 'w')
     for i in range(0, clusters):
         print(result[i], file=doc)
@@ -123,19 +118,29 @@ def sort_tfidf():
 
 def buildw2v():
     # 判断训练的模型文件是否存在
-    if not os.path.exists(save_model_name):  # 模型训练
-        sentences = word2vec.Text8Corpus(filename)  # 加载语料
-        model = Word2Vec(sentences, size=size, min_count=1)  # 训练skip-gram模型
-        model.save(save_model_name)
-        # 二进制类型保存模型 后续直接使用
-        model.wv.save_word2vec_format(save_model_name + ".bin", binary=True)
-    else:
-        print('此训练模型已经存在，不用再次训练')
+    # if not os.path.exists(save_model_name):  # 模型训练
+    #     sentences = word2vec.Text8Corpus(filename)  # 加载语料
+    #     model = Word2Vec(sentences, size=size, min_count=1)  # 训练skip-gram模型
+    #     model.save(save_model_name)
+    #     # 二进制类型保存模型 后续直接使用
+    #     model.wv.save_word2vec_format(save_model_name + ".bin", binary=True)
+    # else:
+    #     print('此训练模型已经存在，不用再次训练')
+    # 暂每次重新生成
+    sentences = word2vec.Text8Corpus(filename)  # 加载语料
+    model = Word2Vec(sentences, size=size, min_count=1)  # 训练skip-gram模型
+    model.save(save_model_name)
+    # 二进制类型保存模型 后续直接使用
+    model.wv.save_word2vec_format(save_model_name + ".bin", binary=True)
 
 def getvec():
     # 加载模型
     model = Word2Vec.load(save_model_name)
     print(model)
+    keys = model.wv.vocab.keys()
+    wordvector = []
+    for key in keys:
+        wordvector.append(model[key])
     count_list = []
     sentence_vector_list = []
     for element in sorted_words_list:
@@ -155,17 +160,17 @@ def getvec():
     return np.array(sentence_vector_list)
 
 
-#v1 tfidf作为向量
+# #v1 tfidf作为向量
 weight, words = countIdf(corpus)
 result, clusters = Kmeans_SC(weight)
-output(result, outputDir, clusters)
+output(result, outputDir, clusters, "tfidf_SC_")
 print('finish')
 
-# word2vec
+# v2 word2vec
 # buildw2v()         # 判断模型是否存在，训练
 # weight, words = countIdf(corpus)
 # sorted_words_list = sort_tfidf() # 每题词tfidf排序
 # sentence_vector_list = getvec()  # 获得句矢量
 # result, clusters = Kmeans_SSE(sentence_vector_list)
-# output(result, outputDir, clusters)
+# output(result, outputDir, clusters, "w2v_SSE_")
 # print('finish')

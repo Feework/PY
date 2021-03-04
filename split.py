@@ -1,13 +1,12 @@
-from openpyxl import load_workbook
+# 分词
 from jieba import lcut
 import re
+import pymysql
 
-# 结巴分词
-# 读取提取出的词库 openpyxl模块是一个读写Excel 2010文档的Python库 load_workbook读取exel文件
-workbook = load_workbook('data.xlsx')
-sheet = workbook.get_sheet_by_name('Sheet')
-rows = sheet.max_row
-cols = sheet.max_column
+conn = pymysql.connect(host='localhost', user='root', password='123456', db='test', autocommit =True)
+cur = conn.cursor()
+sql_get_title = """SELECT * FROM multiple_choice"""
+sql_get_ans = """SELECT * FROM choices WHERE answer_id = %s"""
 
 # 加载停用词库
 stop_f = open('stop_words.txt', "r", encoding='utf-8')
@@ -18,17 +17,24 @@ for line in stop_f.readlines():
         continue
     stop_words.append(line)
 
+cur.execute(sql_get_title)
+result = cur.fetchall()
+
 # 使用 jieba 进行分词
 str_list = list()
-for row in range(1, rows+1):
+for row in result:
     out_str = ''
-    data_title = sheet.cell(row, 1).value
-    data_ans = sheet.cell(row, 2).value
+    data_ans = ''
+    data_title = row[2]
+    ans = str(row[3]).split(",")
+    for i in range(0, len(ans)-1):
+        cur.execute(sql_get_ans, ans[i])
+        data_ans = data_ans + "#" + cur.fetchone()[1]
     word_list = lcut(data_title, cut_all=False) + lcut(data_ans, cut_all=False)
-    #结巴分词 去掉停用词、百分数、小数、单字
+    #结巴分词 去掉停用词、数字、百分数、小数、单字
     for word in word_list:
         if word not in stop_words:
-            if re.search('([0-9.]+)%', word) == None and re.search('[0-9]{1,}[.][0-9]*', word) == None and len(word) != 1:
+            if word.isdigit() == False and re.search('([0-9.]+)%', word) == None and re.search('[0-9]{1,}[.][0-9]*', word) == None and len(word) != 1:
                 if word != '\t':
                     out_str += word.lower()
                     out_str += ' '
