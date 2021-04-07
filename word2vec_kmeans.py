@@ -8,6 +8,7 @@ from sklearn.metrics import silhouette_score
 from gensim.models import Word2Vec
 from gensim.models import word2vec
 import matplotlib.pyplot as plt
+from sklearn.cluster import Birch
 
 outputDir = "./out/"  # 结果输出地址
 filename = "data_cut.txt"
@@ -159,12 +160,44 @@ def getvec():
         count_list.append(count)
     return np.array(sentence_vector_list)
 
+def PCA(weight, dimension):
+    from sklearn.decomposition import PCA
+    print('原有维度: ', len(weight[0]))
+    pca = PCA(n_components=dimension)  # 初始化PCA
+    weight_1 = pca.fit_transform(weight)  # 返回降维后的数据
+    print('降维后维度: ', len(weight_1[0]))
+    return weight_1
+
+def birch_SC(weight, start_k = 2, end_k = 20):  # 待聚类点阵,聚类个数
+    # 轮廓系数法 （权值，范围）
+    scores = []
+    models = []  # 保存每次的模型
+    for i in range(start_k, end_k):
+        birch_model = Birch(n_clusters=i)
+        birch_model.fit(weight)
+        score = silhouette_score(weight, birch_model.labels_, metric='euclidean')
+        scores.append(score)  # 保存每一个k值的score值, 在这里用欧式距离
+        print('{} Means score loss = {}'.format(i, score))
+        models.append(birch_model)
+    clusters = scores.index(max(scores)) + start_k
+    print("轮廓系数法选取最佳K值" + str(clusters))
+
+    y = models[scores.index(max(scores))].fit_predict(weight)
+    # 此处已经进行预测，y中为对应的类，如四个类，【0，0，1，2，3...】
+    result = []
+    for i in range(0, clusters):
+        label_i = []
+        for j in range(0, len(y)):
+            if y[j] == i:
+                label_i.append(j + 1)
+        result.append('类别' + '(' + str(i) + ')' + ':' + str(label_i))
+    return result, clusters
 
 # #v1 tfidf作为向量
-weight, words = countIdf(corpus)
-result, clusters = Kmeans_SC(weight)
-output(result, outputDir, clusters, "tfidf_SC_")
-print('finish')
+# weight, words = countIdf(corpus)
+# result, clusters = Kmeans_SC(weight)
+# output(result, outputDir, clusters, "tfidf_SC_")
+# print('finish')
 
 # v2 word2vec
 # buildw2v()         # 判断模型是否存在，训练
@@ -174,3 +207,12 @@ print('finish')
 # result, clusters = Kmeans_SSE(sentence_vector_list)
 # output(result, outputDir, clusters, "w2v_SSE_")
 # print('finish')
+
+# v3 pca降维 brich算法
+weight, words = countIdf(corpus)
+weight_1 = PCA(weight, dimension=350)  # 将原始权重数据降维
+result, clusters = Kmeans_SC(weight_1)
+output(result, outputDir, clusters, "PCA_tfidf_SC_")
+result, clusters = birch_SC(weight_1)
+output(result, outputDir, clusters, "PCA_birch_SC_")
+print('finish')
