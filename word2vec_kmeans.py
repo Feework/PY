@@ -9,6 +9,7 @@ from gensim.models import Word2Vec
 from gensim.models import word2vec
 import matplotlib.pyplot as plt
 from sklearn.cluster import Birch
+from sklearn.cluster import DBSCAN
 
 outputDir = "./out/"  # 结果输出地址
 filename = "data_cut.txt"
