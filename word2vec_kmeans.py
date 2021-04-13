@@ -7,6 +7,9 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from gensim.models import Word2Vec
 from gensim.models import word2vec
+from gensim.models import Doc2Vec
+from gensim.models import doc2vec
+from gensim.models.doc2vec import TaggedDocument
 import matplotlib.pyplot as plt
 from sklearn.cluster import Birch
 from sklearn.cluster import DBSCAN
@@ -18,7 +21,8 @@ f = open(filename, 'r', encoding='utf-8')  # 语料库 按题读入成[]\
 for line in f.readlines():
     line = line.strip('\n')
     corpus.append(line)
-save_model_name = 'word2vec.model'
+save_model_name_w2v = 'word2vec.model'
+save_model_name_d2v = 'doc2vec.model'
 size = 150
 
 def countIdf(corpus):
@@ -30,7 +34,7 @@ def countIdf(corpus):
     weight = tfidf.toarray()  # 将tf-idf矩阵抽取出来，元素a[i][j]表示j词在i类文本中的tf-idf权重
     return weight, words
 
-def Kmeans_SSE(weight, start_k = 2, end_k = 20):
+def Kmeans_SSE(weight, start_k = 5, end_k = 20):
     #手肘法 (权值，k值范围)
     SSE = []
     SSE_d1 = []  # sse的一阶导数
@@ -68,7 +72,7 @@ def Kmeans_SSE(weight, start_k = 2, end_k = 20):
         result.append('类别' + '(' + str(i) + ')' + ':' + str(label_i))
     return result, clusters
 
-def Kmeans_SC(weight, start_k = 2, end_k = 20):
+def Kmeans_SC(weight, start_k = 5, end_k = 20):
     #轮廓系数法 （权值，范围）
     scores = []
     models = []  # 保存每次的模型
@@ -118,26 +122,42 @@ def sort_tfidf():
         sorted_words_list.append(sorted_words)
     return sorted_words_list
 
+def buildd2v():
+    # sentence = doc2vec.TaggedLineDocument(filename)
+    sentence = []
+    for i, text in enumerate(corpus):
+        text = text.split(' ')
+        sentence.append(TaggedDocument(text, tags=[i]))
+    #加载语料
+    model = Doc2Vec(sentence, min_count=1, window=3, size=150, sample=1e-3, negative=5)
+    model.train(sentence, total_examples=model.corpus_count, epochs=100)
+    model.save(save_model_name_d2v)
+
+def getvec_d2v():
+    # 加载模型
+    model = Doc2Vec.load(save_model_name_d2v)
+    sentence_vector_list = model.docvecs.doctag_syn0
+    return sentence_vector_list
+
 def buildw2v():
     # 判断训练的模型文件是否存在
-    # if not os.path.exists(save_model_name):  # 模型训练
+    # if not os.path.exists(save_model_name_w2v):  # 模型训练
     #     sentences = word2vec.Text8Corpus(filename)  # 加载语料
     #     model = Word2Vec(sentences, size=size, min_count=1)  # 训练skip-gram模型
-    #     model.save(save_model_name)
+    #     model.save(save_model_name_w2v)
     #     # 二进制类型保存模型 后续直接使用
-    #     model.wv.save_word2vec_format(save_model_name + ".bin", binary=True)
+    #     model.wv.save_word2vec_format(save_model_name_w2v + ".bin", binary=True)
     # else:
     #     print('此训练模型已经存在，不用再次训练')
     # 暂每次重新生成
     sentences = word2vec.Text8Corpus(filename)  # 加载语料
     model = Word2Vec(sentences, size=size, min_count=1)  # 训练skip-gram模型
-    model.save(save_model_name)
-    # 二进制类型保存模型 后续直接使用
-    model.wv.save_word2vec_format(save_model_name + ".bin", binary=True)
+    model.train(sentences, total_examples=model.corpus_count, epochs=100)
+    model.save(save_model_name_w2v)
 
-def getvec():
+def getvec_w2v():
     # 加载模型
-    model = Word2Vec.load(save_model_name)
+    model = Word2Vec.load(save_model_name_w2v)
     print(model)
     keys = model.wv.vocab.keys()
     wordvector = []
@@ -201,19 +221,26 @@ def birch_SC(weight, start_k = 2, end_k = 20):  # 待聚类点阵,聚类个数
 # print('finish')
 
 # v2 word2vec
-# buildw2v()         # 判断模型是否存在，训练
-# weight, words = countIdf(corpus)
-# sorted_words_list = sort_tfidf() # 每题词tfidf排序
-# sentence_vector_list = getvec()  # 获得句矢量
-# result, clusters = Kmeans_SSE(sentence_vector_list)
-# output(result, outputDir, clusters, "w2v_SSE_")
-# print('finish')
+buildw2v()         # 判断模型是否存在，训练
+weight, words = countIdf(corpus)
+sorted_words_list = sort_tfidf() # 每题词tfidf排序
+sentence_vector_list = getvec_w2v()  # 获得句矢量
+result, clusters = Kmeans_SC(sentence_vector_list)
+output(result, outputDir, clusters, "w2v_SC_")
+print('finish')
 
 # v3 pca降维 brich算法
-weight, words = countIdf(corpus)
-weight_1 = PCA(weight, dimension=350)  # 将原始权重数据降维
-result, clusters = Kmeans_SC(weight_1)
-output(result, outputDir, clusters, "PCA_tfidf_SC_")
-result, clusters = birch_SC(weight_1)
-output(result, outputDir, clusters, "PCA_birch_SC_")
-print('finish')
+# weight, words = countIdf(corpus)
+# weight_1 = PCA(weight, dimension=350)  # 将原始权重数据降维
+# result, clusters = Kmeans_SC(weight_1)
+# output(result, outputDir, clusters, "PCA_tfidf_SC_")
+# result, clusters = birch_SC(weight_1)
+# output(result, outputDir, clusters, "PCA_birch_SC_")
+# print('finish')
+
+# v4 doc2vec
+# buildd2v()         # 判断模型是否存在，训练
+# sentence_vector_list = getvec_d2v()  # 获得句矢量
+# result, clusters = Kmeans_SC(sentence_vector_list)
+# output(result, outputDir, clusters, "d2v_SSE_")
+# print('finish')
